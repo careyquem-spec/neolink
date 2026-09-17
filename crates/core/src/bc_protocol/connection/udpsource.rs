@@ -783,6 +783,7 @@ async fn connect() -> Result<UdpSocket> {
         .map(|&port| SocketAddr::from(([0, 0, 0, 0], port)))
         .collect();
     let socket = UdpSocket::bind(&addrs[..]).await?;
+    super::disable_udp_connreset(&socket);
 
     Ok(socket)
 }
@@ -801,6 +802,7 @@ async fn connect_try_port(port: u16) -> Result<UdpSocket> {
         .map(|&port| SocketAddr::from(([0, 0, 0, 0], port)))
         .collect();
     let socket = UdpSocket::bind(&addrs[..]).await?;
+    super::disable_udp_connreset(&socket);
 
     Ok(socket)
 }

@@ -406,6 +406,8 @@ impl Discoverer {
             addrs
         });
         let mut addrs = timeout(*MAXIMUM_WAIT, task).await??;
+        // Retired reolink p2p hosts (e.g. p2p4) resolve to 127.0.0.1: skip them
+        addrs.retain(|addr| !addr.ip().is_loopback() && !addr.ip().is_unspecified());
         trace!("Uid lookup to: {:?}", addrs);
 
         Ok(addrs
@@ -1323,6 +1325,7 @@ async fn connect() -> Result<UdpSocket> {
         .map(|&port| SocketAddr::from(([0, 0, 0, 0], port)))
         .collect();
     let socket = UdpSocket::bind(&addrs[..]).await?;
+    super::disable_udp_connreset(&socket);
     socket.set_broadcast(true)?;
 
     Ok(socket)
