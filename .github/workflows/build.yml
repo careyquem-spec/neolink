@@ -11,13 +11,22 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install GStreamer
         run: |
-          choco install -y --no-progress gstreamer --version=1.24.2
-          choco install -y --no-progress gstreamer-devel --version=1.24.2
-          $root = $env:SYSTEMDRIVE + '\gstreamer\1.0\msvc_x86_64\'
-          # Github runners work on both C or D drive
-          if (-not (Test-Path -Path $root -PathType Container)) { $root = 'D:\gstreamer\1.0\msvc_x86_64\' }
-          dir $root
-          Add-Content -Path $env:GITHUB_ENV -Value "GSTREAMER_1_0_ROOT_MSVC_X86_64=$root"
+          $v = '1.26.7'
+          $base = "https://gstreamer.freedesktop.org/data/pkg/windows/$v/msvc"
+          foreach ($f in "gstreamer-1.0-msvc-x86_64-$v.msi", "gstreamer-1.0-devel-msvc-x86_64-$v.msi") {
+            Invoke-WebRequest "$base/$f" -OutFile $f
+            $p = Start-Process msiexec.exe -ArgumentList '/i', $f, '/qn', 'ADDLOCAL=ALL' -Wait -PassThru
+            if ($p.ExitCode -ne 0) { throw "msiexec $f failed with $($p.ExitCode)" }
+          }
+          # The install folder changed between releases: locate it from the pkg-config file
+          $pc = Get-ChildItem -Path 'C:\', 'D:\' -Filter 'gstreamer-1.0.pc' -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'msvc_x86_64\lib\pkgconfig' } | Select-Object -First 1
+          if (-not $pc) { throw 'gstreamer-1.0.pc not found' }
+          $root = $pc.Directory.Parent.Parent.FullName
+          Write-Host "GStreamer root: $root"
+          Get-ChildItem "$root\bin\pkg-config.exe" -ErrorAction SilentlyContinue
+          Add-Content -Path $env:GITHUB_ENV -Value "GSTREAMER_1_0_ROOT_MSVC_X86_64=$root\"
+          Add-Content -Path $env:GITHUB_ENV -Value "PKG_CONFIG_PATH=$root\lib\pkgconfig"
           Add-Content -Path $env:GITHUB_PATH -Value "$root\bin"
       - uses: dtolnay/rust-toolchain@master
         with:
